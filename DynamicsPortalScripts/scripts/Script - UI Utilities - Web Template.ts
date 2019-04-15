@@ -4,6 +4,11 @@
 
 namespace Common {
 
+    /** Some Constants used by the  */
+    // TODO add more constants for selectors
+    const REQUIRED_CLASSNAME: string = "MSFT-requred-field";
+    const DISABLEDFIELD_CLASSNAME: string = "MSFT-disabled-field";
+
     /** Collection of methods enabling general UI manipulation */
     export class ui {
 
@@ -19,11 +24,31 @@ namespace Common {
         };
 
         /**
+         * Function that hides optionset values in the portal
+         * @param controlId target control for the OptionSet 
+         * @param optionSetValue OptionSet value to hide
+         */
+
+        public static hideOptionSetValues(controlId: string, optionSetValue: string) {
+            $("#" + controlId + " option[value=" + optionSetValue + "]").hide();
+        }
+
+        /** Wrapper for selecting an element in JQuery, will ensure that the element Id has a #prefix
+        *   @param {string} elementId html element being selected
+        *   @return {JQuery}
+        **/
+        public static selectObjectById(elementId: string): JQuery {
+            if (elementId.substr(0, 1) != "#") {
+                elementId = "#" + elementId;
+            }
+            return $(elementId);
+        }
+        /**
          * Helper method that will render escaped HTML in elements, such as field labels or sections 
          * @param controlId
          */
         public static renderLabelContents(controlId: string): void {
-            Common.utilities.selectObjectById(controlId).each(
+            Common.ui.selectObjectById(controlId).each(
                 function () {
                     // grab the text of the element
                     var b = $(this).text();
@@ -321,7 +346,7 @@ namespace Common {
         * @return {void}
         **/
         public static disableCheck(controlId: string): void {
-            var ctl: JQuery = Common.utilities.selectObjectById(controlId);
+            var ctl: JQuery = Common.ui.selectObjectById(controlId);
             ctl.removeAttr('checked');
             ctl.attr('disabled', 'disabled');
         }
@@ -331,7 +356,7 @@ namespace Common {
         * @return {void}
         **/
         public static enableCheck(controlId: string): void {
-            var ctl: JQuery = Common.utilities.selectObjectById(controlId);
+            var ctl: JQuery = Common.ui.selectObjectById(controlId);
             ctl.removeAttr('disabled');
         }
 
@@ -370,7 +395,7 @@ namespace Common {
                 enable = false;
             }
 
-            var ctl: JQuery = Common.utilities.selectObjectById(elementId);
+            var ctl: JQuery = Common.ui.selectObjectById(elementId);
             if (clearValue == true) {
                 ctl.val(null);
                 if (ctl.prop("tagName").toLowerCase() == "textarea") {
@@ -401,8 +426,123 @@ namespace Common {
         *   @return {void}
         **/
         public static disableDatePick(controlId: string): void {
-            var cal: JQuery = Common.utilities.selectObjectById(controlId);
+            var cal: JQuery = Common.ui.selectObjectById(controlId);
             cal.next().data("DateTimePicker").destroy();
+        }
+
+
+        /** Helper method that will attach the red asterisk reqired marker to an input control when a control is 
+         * @param {Common.triggerControl} triggerCtl control schema name and control type('check', 'radio', 'optionset', 'text') that will trigger the validation and value determine whether the validation should occur
+         * @param {string} valueControlId schema name of the control value being checked for null
+        **/
+        public static addRequiredMarkingHandler(triggerCtl: triggerControl, valueControlId: string, useClassName?: boolean): void {
+            // add the required marker to the trigger control
+            var trigger: JQuery = Common.ui.selectObjectById(triggerCtl.id);
+
+            // if this is a radio button, we need to react to the check of each in the group.
+            // so get all inputs in the parent and attach change to that!
+            if (triggerCtl.type == "radio") {
+                trigger = trigger.parent().find("input[type='radio']");
+            }
+
+            trigger.change(
+                () => {
+                    var isTriggered: boolean = Common.validators.isControlTriggered(triggerCtl);
+                    Common.ui.toggleFieldRequired(valueControlId, isTriggered, useClassName);
+                }
+            );
+
+            // fire the on change event here so that the validator runs on initial load
+            trigger.trigger("change");
+        }
+
+        /** Hide/show the red asterisk next to a field label to indicate required
+        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
+        *   @param {string} controlId control being flagged as required
+        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
+        **/
+        public static toggleFieldRequired(controlId: string, required?: boolean, useClassName?: boolean): void {
+
+            var controlLabelId: string = controlId + "_label";
+
+            var ctl: JQuery = Common.ui.selectObjectById(controlLabelId);
+            Common.ui.toggleElementRequired(ctl, required, useClassName);
+        }
+
+        /** Helper function that will add a Required indicator on a Section header
+        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
+        *   @param {string} sectionName name of the section in the CRM entity form
+        *   @param {boolean} required option flag indicating whether to add or remove reqiured flag
+        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
+        **/
+        public static toggleSectionRequired(sectionName: string, required?: boolean, useClassName?: boolean): void {
+
+            //var selector: string = "table.section[data-name='" + sectionDataName + "']";
+            //var element: JQuery = $(selector);
+
+            var section: JQuery = Common.ui.getSection(sectionName);
+            if (section.length > 0) {
+                Common.ui.toggleElementRequired(section.prev(), required, useClassName);
+            }
+        }
+
+        /** Helper function that will add a Required indicator on a Tab header
+        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
+        *   @param {string} tabName name of the tab in the CRM entity form
+        *   @param {boolean} required option flag indicating whether to add or remove reqiured flag
+        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
+        **/
+        public static toggleTabRequired(tabName: string, required?: boolean, useClassName?: boolean): void {
+
+            // var selector: string = "div#EntityFormView div.tab.clearfix[data-name='" + tabName + "']";
+            // var element: JQuery = $(selector);
+            var tab: JQuery = Common.ui.getTab(tabName);
+
+            if (tab.length > 0) {
+                Common.ui.toggleElementRequired(tab.prev(), required, useClassName);
+            }
+        }
+
+        /**
+         * Helper method to toggled the required indicator
+         * @param {JQuery} element UI element being flagged as require
+         * @param {boolean} required is required or not 
+         * @param {boolean} useClassName use a class name instead of the injected element
+         */
+        public static toggleElementRequired(element: JQuery, required?: boolean, useClassName?: boolean): void {
+            if (element.length > 0) {
+                var validatorId = element.attr("id") + "_required_indicator";
+
+                // allow for message override
+                if (Common.utilities.isNullUndefinedEmpty(required)) {
+                    required = true;
+                }
+                if (Common.utilities.isNullUndefinedEmpty(useClassName)) {
+                    useClassName = true;
+                }
+
+                if (required) {
+                    if (useClassName) {
+                        element.addClass(REQUIRED_CLASSNAME);
+                    }
+                    else {
+                        // insert the DIV after the element 
+                        if (!Common.utilities.elementExists(validatorId)) {
+                            var div: JQuery = $("<div class='validators' id='" + validatorId + "'/>");
+                            div.html(" *");
+                            div.insertAfter(element);
+                        }
+                    }
+                }
+                else {
+                    if (useClassName) {
+                        element.removeClass(REQUIRED_CLASSNAME);
+                    }
+                    else {
+                        $("#" + validatorId).remove();
+                    }
+                }
+            }
         }
     }
 }

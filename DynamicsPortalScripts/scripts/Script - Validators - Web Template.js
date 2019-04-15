@@ -1,6 +1,4 @@
 'use strict';
-var REQUIRED_CLASSNAME = "MSFT-requred-field";
-var DISABLEDFIELD_CLASSNAME = "MSFT-disabled-field";
 var Common;
 (function (Common) {
     var triggerControl = (function () {
@@ -16,7 +14,7 @@ var Common;
         function validators() {
         }
         validators.addValidator = function (controlId, validatorIdPrefix, failureMessageMask, evalFunction, initialValue, validationGroup) {
-            if (typeof (Page_Validators) == 'undefined') {
+            if (typeof (Common.Page_Validators) == 'undefined') {
                 throw ("Page_Validators is undefined in this web form step");
             }
             if (Common.utilities.isNullUndefinedEmpty(validationGroup))
@@ -40,7 +38,7 @@ var Common;
             validator.validationGroup = validationGroup;
             validator.setAttribute("initialvalue", initialValue);
             validator.evaluationfunction = evalFunction;
-            Page_Validators.push(validator);
+            Common.Page_Validators.push(validator);
         };
         validators.removeValidator = function (validatorId) {
             var validators = window.Page_Validators;
@@ -53,7 +51,7 @@ var Common;
                     Array.remove(validators, validator);
                 }
             }
-            Common.validators.toggleFieldRequired(validatorId, false);
+            Common.ui.toggleFieldRequired(validatorId, false);
         };
         validators.hasValidator = function (validatorId) {
             var validators = window.Page_Validators;
@@ -145,7 +143,7 @@ var Common;
             if (Common.utilities.isNullUndefinedEmpty(failureMessageMask)) {
                 failureMessageMask = "Please provide a value for {label}.";
             }
-            validators.toggleFieldRequired(controlId, true);
+            Common.ui.toggleFieldRequired(controlId, true);
             Common.validators.addValidator(controlId, "GeneralNullValidator", failureMessageMask, function () {
                 var isValid = true;
                 if ($("#" + controlId + " input[type='radio']").length > 0) {
@@ -228,7 +226,7 @@ var Common;
                 valueControlId = [valueControlId];
             }
             $.each(valueControlId, function (i, val) {
-                Common.validators.addRequiredMarkingHandler(triggerCtl, val, false);
+                Common.ui.addRequiredMarkingHandler(triggerCtl, val, false);
                 if (addLinkedEnableToggle) {
                     Common.validators.addLinkedEnableToggle(triggerCtl, val, clearField);
                 }
@@ -293,14 +291,14 @@ var Common;
             return controlId;
         };
         validators.addLinkedEnableToggle = function (triggerCtl, controlId, clearField) {
-            var trigger = Common.utilities.selectObjectById(triggerCtl.id);
+            var trigger = Common.ui.selectObjectById(triggerCtl.id);
             if (triggerCtl.type == "radio") {
                 var name = trigger.attr("name");
                 trigger = $("input[name='" + name + "']", trigger.parent());
             }
             trigger.change(function () {
                 var isTriggered = Common.validators.isControlTriggered(triggerCtl);
-                var ctl = Common.utilities.selectObjectById(controlId);
+                var ctl = Common.ui.selectObjectById(controlId);
                 if (Common.utilities.isNullUndefinedEmpty(clearField)) {
                     clearField = true;
                 }
@@ -332,65 +330,6 @@ var Common;
                     break;
             }
             return isTriggered;
-        };
-        validators.addRequiredMarkingHandler = function (triggerCtl, valueControlId, useClassName) {
-            var trigger = Common.utilities.selectObjectById(triggerCtl.id);
-            if (triggerCtl.type == "radio") {
-                trigger = trigger.parent().find("input[type='radio']");
-            }
-            trigger.change(function () {
-                var isTriggered = Common.validators.isControlTriggered(triggerCtl);
-                Common.validators.toggleFieldRequired(valueControlId, isTriggered, useClassName);
-            });
-            trigger.trigger("change");
-        };
-        validators.toggleFieldRequired = function (controlId, required, useClassName) {
-            var controlLabelId = controlId + "_label";
-            var ctl = Common.utilities.selectObjectById(controlLabelId);
-            Common.validators.toggleElementRequired(ctl, required, useClassName);
-        };
-        validators.toggleSectionRequired = function (sectionName, required, useClassName) {
-            var section = Common.ui.getSection(sectionName);
-            if (section.length > 0) {
-                Common.validators.toggleElementRequired(section.prev(), required, useClassName);
-            }
-        };
-        validators.toggleTabRequired = function (tabName, required, useClassName) {
-            var tab = Common.ui.getTab(tabName);
-            if (tab.length > 0) {
-                Common.validators.toggleElementRequired(tab.prev(), required, useClassName);
-            }
-        };
-        validators.toggleElementRequired = function (element, required, useClassName) {
-            if (element.length > 0) {
-                var validatorId = element.attr("id") + "_required_indicator";
-                if (Common.utilities.isNullUndefinedEmpty(required)) {
-                    required = true;
-                }
-                if (Common.utilities.isNullUndefinedEmpty(useClassName)) {
-                    useClassName = true;
-                }
-                if (required) {
-                    if (useClassName) {
-                        element.addClass(REQUIRED_CLASSNAME);
-                    }
-                    else {
-                        if (!Common.utilities.elementExists(validatorId)) {
-                            var div = $("<div class='validators' id='" + validatorId + "'/>");
-                            div.html(" *");
-                            div.insertAfter(element);
-                        }
-                    }
-                }
-                else {
-                    if (useClassName) {
-                        element.removeClass(REQUIRED_CLASSNAME);
-                    }
-                    else {
-                        $("#" + validatorId).remove();
-                    }
-                }
-            }
         };
         return validators;
     }());

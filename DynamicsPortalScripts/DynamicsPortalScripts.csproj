@@ -88,7 +88,7 @@
     <TypeScriptCompile Include="scripts\Script - UI Utilities - Web Template.ts" />
     <TypeScriptCompile Include="scripts\Script - Validator Samples - Web Template.ts" />
     <TypeScriptCompile Include="scripts\Script - Validators - Web Template.ts" />
-    <TypeScriptCompile Include="scripts\Script Validator Samples - Create and Edit - Entity Form.ts" />
+    <TypeScriptCompile Include="scripts\Script - Validator Samples - Create and Edit - Entity Form.ts" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

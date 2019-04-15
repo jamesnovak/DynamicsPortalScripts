@@ -1,11 +1,22 @@
 'use strict';
 var Common;
 (function (Common) {
+    var REQUIRED_CLASSNAME = "MSFT-requred-field";
+    var DISABLEDFIELD_CLASSNAME = "MSFT-disabled-field";
     var ui = (function () {
         function ui() {
         }
+        ui.hideOptionSetValues = function (controlId, optionSetValue) {
+            $("#" + controlId + " option[value=" + optionSetValue + "]").hide();
+        };
+        ui.selectObjectById = function (elementId) {
+            if (elementId.substr(0, 1) != "#") {
+                elementId = "#" + elementId;
+            }
+            return $(elementId);
+        };
         ui.renderLabelContents = function (controlId) {
-            Common.utilities.selectObjectById(controlId).each(function () {
+            Common.ui.selectObjectById(controlId).each(function () {
                 var b = $(this).text();
                 $(this).empty();
                 $(this).append($("<span>" + b + "</span>"));
@@ -166,12 +177,12 @@ var Common;
             $("[data-date-format='M/D/YYYY h:mm A']").attr("placeholder", "MM/DD/YYYY h:mm A");
         };
         ui.disableCheck = function (controlId) {
-            var ctl = Common.utilities.selectObjectById(controlId);
+            var ctl = Common.ui.selectObjectById(controlId);
             ctl.removeAttr('checked');
             ctl.attr('disabled', 'disabled');
         };
         ui.enableCheck = function (controlId) {
-            var ctl = Common.utilities.selectObjectById(controlId);
+            var ctl = Common.ui.selectObjectById(controlId);
             ctl.removeAttr('disabled');
         };
         ui.toggleCheckEnabled = function (controlIdList, enable) {
@@ -195,7 +206,7 @@ var Common;
             if (Common.utilities.isNullUndefinedEmpty(enable)) {
                 enable = false;
             }
-            var ctl = Common.utilities.selectObjectById(elementId);
+            var ctl = Common.ui.selectObjectById(elementId);
             if (clearValue == true) {
                 ctl.val(null);
                 if (ctl.prop("tagName").toLowerCase() == "textarea") {
@@ -216,8 +227,67 @@ var Common;
             }
         };
         ui.disableDatePick = function (controlId) {
-            var cal = Common.utilities.selectObjectById(controlId);
+            var cal = Common.ui.selectObjectById(controlId);
             cal.next().data("DateTimePicker").destroy();
+        };
+        ui.addRequiredMarkingHandler = function (triggerCtl, valueControlId, useClassName) {
+            var trigger = Common.ui.selectObjectById(triggerCtl.id);
+            if (triggerCtl.type == "radio") {
+                trigger = trigger.parent().find("input[type='radio']");
+            }
+            trigger.change(function () {
+                var isTriggered = Common.validators.isControlTriggered(triggerCtl);
+                Common.ui.toggleFieldRequired(valueControlId, isTriggered, useClassName);
+            });
+            trigger.trigger("change");
+        };
+        ui.toggleFieldRequired = function (controlId, required, useClassName) {
+            var controlLabelId = controlId + "_label";
+            var ctl = Common.ui.selectObjectById(controlLabelId);
+            Common.ui.toggleElementRequired(ctl, required, useClassName);
+        };
+        ui.toggleSectionRequired = function (sectionName, required, useClassName) {
+            var section = Common.ui.getSection(sectionName);
+            if (section.length > 0) {
+                Common.ui.toggleElementRequired(section.prev(), required, useClassName);
+            }
+        };
+        ui.toggleTabRequired = function (tabName, required, useClassName) {
+            var tab = Common.ui.getTab(tabName);
+            if (tab.length > 0) {
+                Common.ui.toggleElementRequired(tab.prev(), required, useClassName);
+            }
+        };
+        ui.toggleElementRequired = function (element, required, useClassName) {
+            if (element.length > 0) {
+                var validatorId = element.attr("id") + "_required_indicator";
+                if (Common.utilities.isNullUndefinedEmpty(required)) {
+                    required = true;
+                }
+                if (Common.utilities.isNullUndefinedEmpty(useClassName)) {
+                    useClassName = true;
+                }
+                if (required) {
+                    if (useClassName) {
+                        element.addClass(REQUIRED_CLASSNAME);
+                    }
+                    else {
+                        if (!Common.utilities.elementExists(validatorId)) {
+                            var div = $("<div class='validators' id='" + validatorId + "'/>");
+                            div.html(" *");
+                            div.insertAfter(element);
+                        }
+                    }
+                }
+                else {
+                    if (useClassName) {
+                        element.removeClass(REQUIRED_CLASSNAME);
+                    }
+                    else {
+                        $("#" + validatorId).remove();
+                    }
+                }
+            }
         };
         ui.MakeFieldReadOnly = function (readField, param) {
             $(readField).prop("readonly", param);

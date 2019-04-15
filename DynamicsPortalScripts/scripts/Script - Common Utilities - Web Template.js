@@ -4,15 +4,6 @@ var Common;
     var utilities = (function () {
         function utilities() {
         }
-        utilities.hideOptionSetValues = function (controlId, optionSetValue) {
-            $("#" + controlId + " option[value=" + optionSetValue + "]").hide();
-        };
-        utilities.selectObjectById = function (elementId) {
-            if (elementId.substr(0, 1) != "#") {
-                elementId = "#" + elementId;
-            }
-            return $(elementId);
-        };
         utilities.isNullOrUndefined = function (obj) {
             return ((obj === null) || (obj === undefined));
         };
@@ -28,11 +19,11 @@ var Common;
             return (Common.utilities.isNullOrUndefined(obj) || (obj === ""));
         };
         utilities.trimTextArea = function (controlId) {
-            var ctl = Common.utilities.selectObjectById(controlId);
+            var ctl = Common.ui.selectObjectById(controlId);
             ctl.val(ctl.val().trim());
         };
         utilities.removeLeadingLineFeed = function (controlId) {
-            var ctl = Common.utilities.selectObjectById(controlId);
+            var ctl = Common.ui.selectObjectById(controlId);
             if (utilities.isNullOrUndefined(ctl)) {
                 return;
             }
@@ -50,7 +41,7 @@ var Common;
             }, 500);
         };
         utilities.elementExists = function (elementId) {
-            var ctl = Common.utilities.selectObjectById(elementId);
+            var ctl = Common.ui.selectObjectById(elementId);
             return (ctl.length > 0);
         };
         return utilities;

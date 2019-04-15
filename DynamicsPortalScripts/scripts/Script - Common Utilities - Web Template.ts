@@ -1,34 +1,20 @@
 ﻿/// <reference path="../typings/jquery/jquery.d.ts"/>
 
-'use strict';
+/** Class containing common utilties */
 
+
+'use strict';
+/**
+ * Overall namespace containing the various script classes:
+ * Common.[[utilities]]
+ * Common.[[ui]]
+ * Common.[[validators]]
+ * */
 namespace Common {
     /**
      * Primary class for utility methods
      * */
     export class utilities {
-
-        /**
-         * Function that hides optionset values in the portal
-         * @param controlId target control for the OptionSet 
-         * @param optionSetValue OptionSet value to hide
-         */
-
-        public static hideOptionSetValues(controlId: string, optionSetValue: string)
-        {
-            $("#" + controlId + " option[value=" + optionSetValue + "]").hide();
-        }
-
-        /** Wrapper for selecting an element in JQuery, will ensure that the element Id has a #prefix
-        *   @param {string} elementId html element being selected
-        *   @return {JQuery}
-        **/
-        public static selectObjectById(elementId: string): JQuery {
-            if (elementId.substr(0, 1) != "#") {
-                elementId = "#" + elementId;
-            }
-            return $(elementId);
-        }
 
         /** Helper method that will check to see if a value is either null or undefined
         * @param {string} obj object being validated
@@ -61,7 +47,7 @@ namespace Common {
          * @param controlId
          */
         public static trimTextArea(controlId: string): void {
-            var ctl: JQuery = Common.utilities.selectObjectById(controlId);
+            var ctl: JQuery = Common.ui.selectObjectById(controlId);
             ctl.val(ctl.val().trim());
         }
 
@@ -71,7 +57,7 @@ namespace Common {
          */
         public static removeLeadingLineFeed(controlId: string): void {
 
-            var ctl: JQuery = Common.utilities.selectObjectById(controlId);
+            var ctl: JQuery = Common.ui.selectObjectById(controlId);
 
             // ignore disabled/readonly
             if (utilities.isNullOrUndefined(ctl)) {
@@ -102,7 +88,7 @@ namespace Common {
         **/
         public static elementExists(elementId):boolean {
             // make sure the control exists~
-            var ctl: JQuery = Common.utilities.selectObjectById(elementId);
+            var ctl: JQuery = Common.ui.selectObjectById(elementId);
 
             return (ctl.length >  0);
         }

@@ -3,20 +3,23 @@
 /// <reference path="../typings/jquery/jquery.d.ts"/>
 'use strict';
 
-/** Constants! */
-// TODO add more constants for selectors
-const REQUIRED_CLASSNAME: string = "MSFT-requred-field";
-const DISABLEDFIELD_CLASSNAME: string = "MSFT-disabled-field";
-
+/**
+ * General namespace for all Portal related scripts.
+ * This can be modified for a business or project but all references will need to be updated
+ * @preferred
+ */
 namespace Common {
-    /** Interface to capture a triggering control properties
+
+    /** Interface that defines triggering control parameter
+     * This is intended to group properties for Trigger controls rather than long lists
      * **/
     export interface ITriggerControl {
         id: string,
         type: string,
         value: any
     }
-    /** Helper class to clean up the method calls */
+    /** Implementation of [[ITriggerControl]] used as a method parameter in several linked validators
+     */
     export class triggerControl implements ITriggerControl {
         /**
          * Constructor
@@ -34,6 +37,10 @@ namespace Common {
         value: any;
     }
 
+    /**
+     * Contains custom Portal Validators and related helper utilities 
+     * Extending functionality described here: [Adding custom JavaScript](https://docs.microsoft.com/en-us/dynamics365/customer-engagement/portals/add-custom-javascript)
+     * */
     export class validators {
 
         /** 
@@ -48,7 +55,7 @@ namespace Common {
         **/
         public static addValidator(controlId: string, validatorIdPrefix: string, failureMessageMask: string, evalFunction: () => boolean, initialValue?: string, validationGroup?: string): void {
 
-            if (typeof (Page_Validators) == 'undefined') {
+            if (typeof (Common.Page_Validators) == 'undefined') {
                 throw ("Page_Validators is undefined in this web form step");
             }
 
@@ -90,7 +97,9 @@ namespace Common {
         }
 
         /**
-         * Remove an existing validator from a control 
+         * Remove an existing validator from a control. 
+         * If passing the control Id, all validators for that control will be removed.
+         * 
          * @param validatorId {string} ID of the validator
          */
         public static removeValidator(validatorId: string): void {
@@ -106,7 +115,7 @@ namespace Common {
                 }
             }
             // ensure that the field is not still flagged as required 
-            Common.validators.toggleFieldRequired(validatorId, false);
+            Common.ui.toggleFieldRequired(validatorId, false);
         }
 
         /**
@@ -131,6 +140,11 @@ namespace Common {
 
         /**
          * Ensures that a date is on or after a min date, on or before a max date, or between both dates.
+         * 
+         * Example usage:
+         * ```
+         *  Common.validators.addDateRangeValidator("futz_daterangevalue", new Date("10/10/2015"), new Date("10/10/2025"));
+         * ```
          * @param {string} controlId Date control being validated
          * @param {Date} minDate min date allowed for the control
          * @param {Date} maxDate max date allowed for the control
@@ -195,7 +209,12 @@ namespace Common {
         }
 
         /**
-         * Ensure that a date is or or before a given date
+         * Ensure that a date is or or before a given date.
+         * 
+         * Example usage:
+         * ```typescript
+         *  Common.validators.addMaxDateValidator("futz_maxdatevalue", new Date("10/10/2020"));
+         * ```
          * @param {string} controlId Date control being validated
          * @param {Date} maxDate max date allowed for the control
          */
@@ -205,6 +224,11 @@ namespace Common {
 
         /**
          * Ensure that a date is on or after a given date
+         * 
+         * Example usage:
+         * ```typescript
+         * Common.validators.addMinDateValidator("futz_mindatevalue", new Date("10/10/2017"));
+         * ```
          * @param {string} controlId Date control being validated
          * @param {Date} minDate  min date allowed for the control
          */
@@ -213,6 +237,11 @@ namespace Common {
         }
 
         /** Injects a new control validator that restricts users from entering dates set in the future
+         * 
+         * Example usage:
+         * ```typescript
+         * Common.validators.addFutureDateValidator("futz_nofuturedate");
+         * ```
         * @param {string} controlId schema name of the control being validated
         * @return {void}
         **/
@@ -264,7 +293,7 @@ namespace Common {
                 failureMessageMask = "Please provide a value for {label}.";
             }
 
-            validators.toggleFieldRequired(controlId, true);
+            Common.ui.toggleFieldRequired(controlId, true);
 
             // use the helper method to inject the null dependent null value check
             Common.validators.addValidator(controlId,
@@ -414,6 +443,11 @@ namespace Common {
 
         /** Injects a new control validator that will validate the contents of a text field if a check box has been checked
          * Modified to handle both a string or string array of valueControlId's in order to affect multiple fields 
+         * 
+         * Example usage:
+         * ```typescript
+         * Common.validators.addLinkedNullValidator(new Common.triggerControl("futz_linkedcheckbox", "check", true), "futz_linkedtextboxcheckbox", "Please enter a value for the 'Linked Text Box - Checkbox'", true);
+         * ```
          * @param {Common.triggerControl} triggerCtl control schema name and control type('check', 'radio', 'optionset', 'text') that will trigger the validation and value determine whether the validation should occur
          * @param {string | string[]} valueControlId schema name of the control value being checked for null
          * @param {string} failureMessageMask optional mask for the message to be displayed. The slug {label} will be replaced with the value field label
@@ -443,7 +477,7 @@ namespace Common {
             // iterate
             $.each(valueControlId, (i, val) => {
                 // add the required marker to the trigger control
-                Common.validators.addRequiredMarkingHandler(triggerCtl, val, false);
+                Common.ui.addRequiredMarkingHandler(triggerCtl, val, false);
 
                 // if indicated, add the enable toggle to the target value control
                 if (addLinkedEnableToggle) {
@@ -580,7 +614,7 @@ namespace Common {
         public static addLinkedEnableToggle(triggerCtl: triggerControl, controlId: string, clearField?: boolean): void {
 
             // grab the target trigger control.
-            var trigger: JQuery = Common.utilities.selectObjectById(triggerCtl.id);
+            var trigger: JQuery = Common.ui.selectObjectById(triggerCtl.id);
 
             // if this is a radio button, we need to trigger on the group change to account for deselect.
             // so get the name and use that as the selector
@@ -593,7 +627,7 @@ namespace Common {
             // add the change handler
             trigger.change(() => {
                 var isTriggered: boolean = Common.validators.isControlTriggered(triggerCtl);
-                var ctl: JQuery = Common.utilities.selectObjectById(controlId);
+                var ctl: JQuery = Common.ui.selectObjectById(controlId);
 
                 if (Common.utilities.isNullUndefinedEmpty(clearField)) {
                     clearField = true;
@@ -639,118 +673,5 @@ namespace Common {
             return isTriggered;
         }
 
-        /** Helper method that will attach the red asterisk reqired marker to an input control when a control is 
-         * @param {Common.triggerControl} triggerCtl control schema name and control type('check', 'radio', 'optionset', 'text') that will trigger the validation and value determine whether the validation should occur
-         * @param {string} valueControlId schema name of the control value being checked for null
-        **/
-        public static addRequiredMarkingHandler(triggerCtl: triggerControl, valueControlId: string, useClassName?: boolean): void {
-            // add the required marker to the trigger control
-            var trigger: JQuery = Common.utilities.selectObjectById(triggerCtl.id);
-
-            // if this is a radio button, we need to react to the check of each in the group.
-            // so get all inputs in the parent and attach change to that!
-            if (triggerCtl.type == "radio") {
-                trigger = trigger.parent().find("input[type='radio']");
-            }
-
-            trigger.change(
-                () => {
-                    var isTriggered: boolean = Common.validators.isControlTriggered(triggerCtl);
-                    Common.validators.toggleFieldRequired(valueControlId, isTriggered, useClassName);
-                }
-            );
-
-            // fire the on change event here so that the validator runs on initial load
-            trigger.trigger("change");
-        }
-
-        /** Hide/show the red asterisk next to a field label to indicate required
-        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
-        *   @param {string} controlId control being flagged as required
-        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
-        **/
-        public static toggleFieldRequired(controlId: string, required?: boolean, useClassName?: boolean): void {
-
-            var controlLabelId: string = controlId + "_label";
-
-            var ctl: JQuery = Common.utilities.selectObjectById(controlLabelId);
-            Common.validators.toggleElementRequired(ctl, required, useClassName);
-        }
-
-        /** Helper function that will add a Required indicator on a Section header
-        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
-        *   @param {string} sectionName name of the section in the CRM entity form
-        *   @param {boolean} required option flag indicating whether to add or remove reqiured flag
-        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
-        **/
-        public static toggleSectionRequired(sectionName: string, required?: boolean, useClassName?: boolean): void {
-
-            //var selector: string = "table.section[data-name='" + sectionDataName + "']";
-            //var element: JQuery = $(selector);
-
-            var section: JQuery = Common.ui.getSection(sectionName);
-            if (section.length > 0) {
-                Common.validators.toggleElementRequired(section.prev(), required, useClassName);
-            }
-        }
-
-        /** Helper function that will add a Required indicator on a Tab header
-        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
-        *   @param {string} tabName name of the tab in the CRM entity form
-        *   @param {boolean} required option flag indicating whether to add or remove reqiured flag
-        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
-        **/
-        public static toggleTabRequired(tabName: string, required?: boolean, useClassName?: boolean): void {
-
-            // var selector: string = "div#EntityFormView div.tab.clearfix[data-name='" + tabName + "']";
-            // var element: JQuery = $(selector);
-            var tab: JQuery = Common.ui.getTab(tabName);
-            
-            if (tab.length > 0) {
-                Common.validators.toggleElementRequired(tab.prev(), required, useClassName);
-            }
-        }
-
-        /**
-         * Helper method to toggled the required indicator
-         * @param {JQuery} element UI element being flagged as require
-         * @param {boolean} required is required or not 
-         * @param {boolean} useClassName use a class name instead of the injected element
-         */
-        public static toggleElementRequired(element: JQuery, required?: boolean, useClassName?: boolean): void {
-            if (element.length > 0) {
-                var validatorId = element.attr("id") + "_required_indicator";
-
-                // allow for message override
-                if (Common.utilities.isNullUndefinedEmpty(required)) {
-                    required = true;
-                }
-                if (Common.utilities.isNullUndefinedEmpty(useClassName)) {
-                    useClassName = true;
-                }
-
-                if (required) {
-                    if (useClassName) {
-                        element.addClass(REQUIRED_CLASSNAME);
-                    }
-                    else {
-                        // insert the DIV after the element 
-                        if (!Common.utilities.elementExists(validatorId)) {
-                            var div: JQuery = $("<div class='validators' id='" + validatorId + "'/>");
-                            div.html(" *");
-                            div.insertAfter(element);
-                        }
-                    }
-                }
-                else {
-                    if (useClassName) {
-                        element.removeClass(REQUIRED_CLASSNAME);
-                    }
-                    else {
-                        $("#" + validatorId).remove();
-                    }
-                }
-            }
-        }
     }
 }
