@@ -606,6 +606,103 @@ namespace Common {
             return controlId;
         }
 
+
+        /** Adds a validator that will ensure that a max number of check boxes have been checked for a specific section
+            @param {string} sectionName     name of the section that contains the group of checkboxes
+            @param {string} validationGroup     validation group for the checkboxes
+            @param {boolean} maxChecked         max number of items to be checked.  Default: 1
+            @param {string} failureMessageMask  failure message when the max number of items is not checked
+        **/
+        public static addMaxCheckedInGroupValidator(checkIds: Array<string>, validationGroup: string, maxChecked?: number, failureMessageMask?: string) {
+
+            if (Common.utilities.isNullUndefinedEmpty(maxChecked)) {
+                maxChecked = 1;
+            }
+            var labels: Array<string> = new Array<string>();
+
+            // built label
+            for (var id of checkIds) {
+                labels.push($("#" + id + "_label").text());
+            }
+
+            if (Common.utilities.isNullUndefinedEmpty(failureMessageMask)) {
+                failureMessageMask = "Please check at most " + maxChecked + " item(s) out of the following options: "
+                    + labels.map(x => "'" + x + "'").join(", ");
+            }
+
+            // get ID of the first checkbox so we can attach a validator 
+            var controlId: string = checkIds[0];
+            var selector: string = checkIds.map(x => "#" + x + ":checked").join(',');
+
+            Common.validators.addValidator(controlId,
+                "MaxCheckedGroupRequired",
+                failureMessageMask,
+                () => {
+                    // check to see if any checked 
+                    var checkedCount: number = $(selector).length;
+                    var isValid: boolean = (checkedCount <= maxChecked);
+
+                    return isValid;
+                },
+                null,
+                validationGroup
+            );
+        }
+
+        /**
+         *  Helper method to get the control Id of the first checkbox in a section
+         * @param section {JQuery} section element 
+         */
+        private static GetCheckBoxControlId(section: JQuery): string {
+            // get the list of checkboxes in the section and grab the ID
+            var firstCheck: JQuery = $(" tbody tr td.cell.checkbox-cell input[type='checkbox']", section).first();
+            var controlId: string = firstCheck.attr("id");
+
+            return controlId;
+        }
+
+        /**
+         * Add an email validator to a text control
+         * @param controlId one or more IDs to which the validator will be applied.
+         * @param failureMessageMask Failure message for the user
+         */
+        public static addEmailValidator(controlId: string | string[], failureMessageMask?: string): void {
+
+            var regEx: RegExp = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+
+            Common.validators.addRegExValidator(controlId, regEx, "Please provide a valid email address.");
+        }
+        /**
+         * General method for applying a regular expression validator to a control
+         * @param controlId one or more control Ids for validaton
+         * @param regEx regEx for the test
+         * @param failureMessageMask Failure message for the validation
+         */
+        public static addRegExValidator(controlId: string | string[], regEx: RegExp, failureMessageMask?: string): void {
+            //check to see if controlId is a string or string array, for the looping
+            if (typeof controlId === 'string') {
+                controlId = [controlId];
+            }
+
+            if (Common.utilities.isNullUndefinedEmpty(failureMessageMask)) {
+                failureMessageMask = "The value provided is not in the correct format.";
+            }
+
+            $.each(controlId, (i, ctlId) => {
+
+                Common.validators.addValidator(ctlId, "RegEx", failureMessageMask, () => {
+                    var isValid: boolean = true;
+                    var val = $("#" + ctlId).val();
+                    if (!Common.utilities.isNullUndefinedEmpty(val)) {
+
+                        isValid = regEx.test(val);
+                        console.log("regex validator: " + val + ", isValid:" + isValid + ", " + regEx);
+                    }
+                    return isValid;
+                });
+            });
+        }
+
         /** Helper method that will enable or disable a target control based on another trigger control
         * @param {Common.triggerControl} triggerCtl control schema name and control type('check', 'radio', 'optionset', 'text') that will trigger the validation and value determine whether the validation should occur
         * @param {string} controlId schema name of the control value being checked enable/disable
