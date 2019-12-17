@@ -1,11 +1,67 @@
 'use strict';
 var Common;
 (function (Common) {
-    var REQUIRED_CLASSNAME = "MSFT-requred-field";
-    var DISABLEDFIELD_CLASSNAME = "MSFT-disabled-field";
     var ui = (function () {
         function ui() {
         }
+        ui.AnimateHideAndShow = function () {
+            return !$("#loader").is(":visible");
+        };
+        ui.AnimateHideElement = function (element) {
+            if (!Common.ui.AnimateHideAndShow()) {
+                element.hide();
+            }
+            else {
+                var activeElement = $(document.activeElement);
+                var doc = $(document);
+                var currentOffset = 0;
+                if (activeElement) {
+                    var top = 0;
+                    if (!Common.utilities.isNullUndefinedEmpty(activeElement.offset())) {
+                        top = activeElement.offset().top;
+                    }
+                    currentOffset = top - doc.scrollTop();
+                }
+                element.slideUp('fast', function () {
+                    if (activeElement) {
+                        var top = 0;
+                        if (!Common.utilities.isNullUndefinedEmpty(activeElement.offset())) {
+                            top = activeElement.offset().top;
+                        }
+                        doc.scrollTop(top - currentOffset);
+                    }
+                });
+            }
+        };
+        ui.AnimateShowElement = function (element) {
+            if (!Common.ui.AnimateHideAndShow()) {
+                element.show();
+            }
+            else {
+                var activeElement = $(document.activeElement);
+                var doc = $(document);
+                var currentOffset = 0;
+                if (activeElement) {
+                    var top = 0;
+                    if (!Common.utilities.isNullUndefinedEmpty(activeElement.offset())) {
+                        top = activeElement.offset().top;
+                    }
+                    currentOffset = top - doc.scrollTop();
+                }
+                element.slideDown('fast', function () {
+                    if (activeElement) {
+                        var top = 0;
+                        if (!Common.utilities.isNullUndefinedEmpty(activeElement.offset())) {
+                            top = activeElement.offset().top;
+                        }
+                        doc.scrollTop(top - currentOffset);
+                    }
+                });
+            }
+        };
+        ui.FocusOnFirstField = function () {
+            window.setTimeout(function () { $('select:visible:not([readonly]):first, input:visible:not([readonly]):not([type=checkbox]):first').first().focus(); }, 200);
+        };
         ui.hideOptionSetValues = function (controlId, optionSetValue) {
             $("#" + controlId + " option[value=" + optionSetValue + "]").hide();
         };
@@ -16,7 +72,7 @@ var Common;
             return $(elementId);
         };
         ui.renderLabelContents = function (controlId) {
-            Common.ui.selectObjectById(controlId).each(function () {
+            Common.utilities.selectObjectById(controlId).each(function () {
                 var b = $(this).text();
                 $(this).empty();
                 $(this).append($("<span>" + b + "</span>"));
@@ -54,10 +110,10 @@ var Common;
         };
         ui.hideTab = function (tabSelector, clearValues) {
             var tab = Common.ui.getTab(tabSelector);
-            tab.hide();
+            Common.ui.AnimateHideElement(tab);
             var header = tab.prev("h2");
             if (header.length > 0) {
-                header.hide();
+                Common.ui.AnimateHideElement(header);
             }
             if (clearValues === true) {
                 Common.ui.clearTabValues(tabSelector);
@@ -65,10 +121,10 @@ var Common;
         };
         ui.showTab = function (tabSelector) {
             var tab = Common.ui.getTab(tabSelector);
-            tab.show();
+            Common.ui.AnimateShowElement(tab);
             var header = tab.prev("h2");
             if (header.length > 0) {
-                header.show();
+                Common.ui.AnimateShowElement(header);
             }
         };
         ui.getTab = function (tabSelector) {
@@ -91,9 +147,8 @@ var Common;
                         label = $(headEl.firstChild).text();
                     }
                     else {
-                        label = headEl.text();
+                        label = $(headEl.firstChild).text();
                     }
-                    label = $(headEl.firstChild).text();
                 }
             }
             return label;
@@ -172,17 +227,64 @@ var Common;
         };
         ui.maskDate = function () {
             $("[data-date-format='M/D/YYYY']").attr("placeholder", "MM/DD/YYYY");
+            $("div.text-muted:contains('—')").remove();
+            $('input.datetime').each(function (index, ctlDT) {
+                $("#" + ctlDT.id).next().data("DateTimePicker").options({ format: 'MM/DD/YYYY' });
+                $("#" + ctlDT.id).next().children("input").attr("id", ctlDT.id + "_input");
+                Common.ui.mask(ctlDT.id + "_input", "00/00/0000");
+            });
         };
-        ui.maskDateTime = function () {
-            $("[data-date-format='M/D/YYYY h:mm A']").attr("placeholder", "MM/DD/YYYY h:mm A");
+        ui.mask = function (controlId, maskPattern) {
+            Common.ui.ensureMaskJsLoaded();
+            var ctl = $("#" + controlId);
+            ctl.mask(maskPattern);
+        };
+        ui.unmask = function (controlId) {
+            Common.ui.ensureMaskJsLoaded();
+            var ctl = $("#" + controlId);
+            ctl.unmask();
+        };
+        ui.maskInitials = function (controlId) {
+            Common.ui.ensureMaskJsLoaded();
+            var ctl = $("#" + controlId);
+            ctl.mask("SSS");
+        };
+        ui.maskPhoneNumber = function (controlId) {
+            Common.ui.ensureMaskJsLoaded();
+            var intCtl = $("#" + controlId + '_international');
+            if (!Common.utilities.isNullUndefinedEmpty(intCtl)) {
+                var intChangeFunction = function () {
+                    Common.ui.unmask(controlId);
+                    if (!intCtl.is(":checked")) {
+                        Common.ui.mask(controlId, "000-000-0000");
+                        $("#" + controlId).attr("placeholder", "XXX-XXX-XXXX");
+                    }
+                    else {
+                        Common.ui.mask(controlId, "+00 0000000000");
+                        $("#" + controlId).attr("placeholder", "+XX XXXXXXXXXX");
+                    }
+                };
+                intCtl.change(intChangeFunction);
+                intChangeFunction();
+            }
+        };
+        ui.ensureMaskJsLoaded = function () {
+        };
+        ui.restrictSpecialCharacters = function (controlId) {
+            $("#" + controlId).on('keypress', function (event) {
+                var pattern = /^[A-Za-z ``'.-]+$/;
+                if (!pattern.test(event.key)) {
+                    return false;
+                }
+            });
         };
         ui.disableCheck = function (controlId) {
-            var ctl = Common.ui.selectObjectById(controlId);
+            var ctl = Common.utilities.selectObjectById(controlId);
             ctl.removeAttr('checked');
             ctl.attr('disabled', 'disabled');
         };
         ui.enableCheck = function (controlId) {
-            var ctl = Common.ui.selectObjectById(controlId);
+            var ctl = Common.utilities.selectObjectById(controlId);
             ctl.removeAttr('disabled');
         };
         ui.toggleCheckEnabled = function (controlIdList, enable) {
@@ -199,95 +301,90 @@ var Common;
                 }
             }
         };
-        ui.toggleElementEnabled = function (elementId, enable, clearValue) {
+        ui.toggleElementEnabled = function (elementId, enable, clearValue, hide) {
             if (Common.utilities.isNullUndefinedEmpty(clearValue)) {
                 clearValue = false;
             }
             if (Common.utilities.isNullUndefinedEmpty(enable)) {
                 enable = false;
             }
-            var ctl = Common.ui.selectObjectById(elementId);
-            if (clearValue == true) {
-                ctl.val(null);
-                if (ctl.prop("tagName").toLowerCase() == "textarea") {
-                    ctl.empty();
-                }
+            if (Common.utilities.isNullOrUndefined(hide)) {
+                hide = false;
             }
+            var ctl = Common.utilities.selectObjectById(elementId);
             if (enable) {
-                ctl.removeAttr('readonly');
+                if (ctl.parents(".form-readonly").length == 0) {
+                    ctl.removeAttr('readonly');
+                }
+                if (hide) {
+                    Common.ui.showElement(elementId);
+                }
             }
             else {
                 ctl.attr('readonly', true);
+                if (hide) {
+                    Common.ui.hideElement(elementId);
+                }
+                if (clearValue == true) {
+                    ctl.val(null);
+                    if (ctl.prop("tagName").toLowerCase() == "textarea") {
+                        ctl.empty();
+                    }
+                    var ctl_name = Common.utilities.selectObjectById(elementId + "_name");
+                    if (!Common.utilities.isNullUndefinedEmpty(ctl_name)) {
+                        ctl_name.val(null);
+                    }
+                    $("#" + elementId + " input[type=radio]:checked").attr('checked', false);
+                    $("input[type=checkbox]:checked" + "#" + elementId).attr('checked', false);
+                    $("#" + elementId).change();
+                }
             }
         };
-        ui.toggleElementsEnabled = function (elementIdList, enable, clearValue) {
+        ui.hideElement = function (controlId) {
+            Common.ui.toggleElementDisplay(controlId, true);
+        };
+        ui.showElement = function (controlId) {
+            Common.ui.toggleElementDisplay(controlId, false);
+        };
+        ui.toggleElementDisplay = function (controlId, hide) {
+            var ctl = Common.utilities.selectObjectById(controlId);
+            var fieldContainer = ctl.parents("td.cell");
+            if (!Common.utilities.isNullOrUndefined(fieldContainer)) {
+                if (hide) {
+                    Common.ui.AnimateHideElement(fieldContainer);
+                }
+                else {
+                    Common.ui.AnimateShowElement(fieldContainer);
+                }
+            }
+            else {
+                if (hide) {
+                    Common.ui.AnimateHideElement(ctl);
+                }
+                else {
+                    Common.ui.AnimateShowElement(ctl);
+                }
+            }
+        };
+        ui.toggleElementsEnabled = function (elementIdList, enable, clearValue, hide) {
             for (var _i = 0, elementIdList_1 = elementIdList; _i < elementIdList_1.length; _i++) {
                 var elementId = elementIdList_1[_i];
-                Common.ui.toggleElementEnabled(elementId, enable, clearValue);
+                Common.ui.toggleElementEnabled(elementId, enable, clearValue, hide);
             }
         };
         ui.disableDatePick = function (controlId) {
-            var cal = Common.ui.selectObjectById(controlId);
+            var cal = Common.utilities.selectObjectById(controlId);
             cal.next().data("DateTimePicker").destroy();
         };
-        ui.addRequiredMarkingHandler = function (triggerCtl, valueControlId, useClassName) {
-            var trigger = Common.ui.selectObjectById(triggerCtl.id);
-            if (triggerCtl.type == "radio") {
-                trigger = trigger.parent().find("input[type='radio']");
-            }
-            trigger.change(function () {
-                var isTriggered = Common.validators.isControlTriggered(triggerCtl);
-                Common.ui.toggleFieldRequired(valueControlId, isTriggered, useClassName);
-            });
-            trigger.trigger("change");
-        };
-        ui.toggleFieldRequired = function (controlId, required, useClassName) {
-            var controlLabelId = controlId + "_label";
-            var ctl = Common.ui.selectObjectById(controlLabelId);
-            Common.ui.toggleElementRequired(ctl, required, useClassName);
-        };
-        ui.toggleSectionRequired = function (sectionName, required, useClassName) {
-            var section = Common.ui.getSection(sectionName);
-            if (section.length > 0) {
-                Common.ui.toggleElementRequired(section.prev(), required, useClassName);
+        ui.setLabelText = function (field, labelText) {
+            var label = $('#' + field + '_label');
+            if (!Common.utilities.isNullOrUndefined(label)) {
+                label.html(labelText);
             }
         };
-        ui.toggleTabRequired = function (tabName, required, useClassName) {
-            var tab = Common.ui.getTab(tabName);
-            if (tab.length > 0) {
-                Common.ui.toggleElementRequired(tab.prev(), required, useClassName);
-            }
-        };
-        ui.toggleElementRequired = function (element, required, useClassName) {
-            if (element.length > 0) {
-                var validatorId = element.attr("id") + "_required_indicator";
-                if (Common.utilities.isNullUndefinedEmpty(required)) {
-                    required = true;
-                }
-                if (Common.utilities.isNullUndefinedEmpty(useClassName)) {
-                    useClassName = true;
-                }
-                if (required) {
-                    if (useClassName) {
-                        element.addClass(REQUIRED_CLASSNAME);
-                    }
-                    else {
-                        if (!Common.utilities.elementExists(validatorId)) {
-                            var div = $("<div class='validators' id='" + validatorId + "'/>");
-                            div.html(" *");
-                            div.insertAfter(element);
-                        }
-                    }
-                }
-                else {
-                    if (useClassName) {
-                        element.removeClass(REQUIRED_CLASSNAME);
-                    }
-                    else {
-                        $("#" + validatorId).remove();
-                    }
-                }
-            }
+        ui.getLabelText = function (field) {
+            var label = $('#' + field + '_label');
+            return label.html();
         };
         ui.MakeFieldReadOnly = function (readField, param) {
             $(readField).prop("readonly", param);

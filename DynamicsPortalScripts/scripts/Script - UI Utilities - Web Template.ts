@@ -4,13 +4,84 @@
 
 namespace Common {
 
-    /** Some Constants used by the  */
-    // TODO add more constants for selectors
-    const REQUIRED_CLASSNAME: string = "MSFT-requred-field";
-    const DISABLEDFIELD_CLASSNAME: string = "MSFT-disabled-field";
-
     /** Collection of methods enabling general UI manipulation */
     export class ui {
+
+        /** 
+         */
+        public static AnimateHideAndShow() {
+            return !$("#loader").is(":visible"); // do not animate when loader is shown.
+        }
+
+        /**
+         * 
+         * @param element
+         */
+        public static AnimateHideElement(element: JQuery) {
+            if (!Common.ui.AnimateHideAndShow()) {
+                element.hide();
+            }
+            else {
+                var activeElement = $(document.activeElement); // code for maintaining scroll position as elements are added/removed
+                var doc = $(document);
+                var currentOffset = 0;
+                if (activeElement) {
+                    var top = 0;
+                    if (!Common.utilities.isNullUndefinedEmpty(activeElement.offset())) {
+                        top = activeElement.offset().top;
+                    }
+                    currentOffset = top - doc.scrollTop();
+                }
+
+                element.slideUp('fast', () => {
+                    if (activeElement) {
+                        var top = 0;
+                        if (!Common.utilities.isNullUndefinedEmpty(activeElement.offset())) {
+                            top = activeElement.offset().top;
+                        }
+                        doc.scrollTop(top - currentOffset);
+                    }
+                });
+            }
+        }
+        /**
+         * 
+         * @param element
+         */
+        public static AnimateShowElement(element: JQuery) {
+            if (!Common.ui.AnimateHideAndShow()) {
+                element.show();
+            }
+            else {
+                var activeElement = $(document.activeElement); // code for maintaining scroll position as elements are added/removed
+                var doc = $(document);
+                var currentOffset = 0;
+                if (activeElement) {
+                    var top = 0;
+                    if (!Common.utilities.isNullUndefinedEmpty(activeElement.offset())) {
+                        top = activeElement.offset().top;
+                    }
+                    currentOffset = top - doc.scrollTop();
+                }
+
+                element.slideDown('fast', () => {
+                    if (activeElement) {
+                        var top = 0;
+                        if (!Common.utilities.isNullUndefinedEmpty(activeElement.offset())) {
+                            top = activeElement.offset().top;
+                        }
+                        doc.scrollTop(top - currentOffset);
+                    }
+                });
+            }
+        }
+
+        /**
+         * Select the first Input field on the form.  Adding a delay to account for inconsistenices in load of Modal Entity forms
+         * */
+        public static FocusOnFirstField() {
+            window.setTimeout(function () { $('select:visible:not([readonly]):first, input:visible:not([readonly]):not([type=checkbox]):first').first().focus(); }, 200);
+        }
 
         /** This function makes fields read only true or not read only 
         takes field name (#msft_person_name for example) and true or false.
@@ -48,7 +119,7 @@ namespace Common {
          * @param controlId
          */
         public static renderLabelContents(controlId: string): void {
-            Common.ui.selectObjectById(controlId).each(
+            Common.utilities.selectObjectById(controlId).each(
                 function () {
                     // grab the text of the element
                     var b = $(this).text();
@@ -122,12 +193,12 @@ namespace Common {
          */
         public static hideTab(tabSelector: string, clearValues?: boolean): void {
             var tab: JQuery = Common.ui.getTab(tabSelector);
-            tab.hide();
+            Common.ui.AnimateHideElement(tab);
 
             // grab the tab header, which is an H2 element
             var header: JQuery = tab.prev("h2");
             if (header.length > 0) {
-                header.hide();
+                Common.ui.AnimateHideElement(header);
             }
 
             // clear values too 
@@ -142,11 +213,12 @@ namespace Common {
         **/
         public static showTab(tabSelector: string): void {
             var tab: JQuery = Common.ui.getTab(tabSelector);
-            tab.show();
+            Common.ui.AnimateShowElement(tab);
+
             // grab the tab header, which is an H2 element
             var header: JQuery = tab.prev("h2");
             if (header.length > 0) {
-                header.show();
+                Common.ui.AnimateShowElement(header);
             }
         }
 
@@ -184,10 +256,8 @@ namespace Common {
                         label = $(headEl.firstChild).text();
                     }
                     else {
-                        label = headEl.text();
+                        label = $(headEl.firstChild).text();
                     }
-
-                    label = $(headEl.firstChild).text();
                 }
             }
             return label;
@@ -331,14 +401,88 @@ namespace Common {
         public static maskDate(): void {
             // apply the placeholder for the dates
             $("[data-date-format='M/D/YYYY']").attr("placeholder", "MM/DD/YYYY");
+
+            $("div.text-muted:contains('—')").remove(); // need to remove first
+            $('input.datetime').each((index, ctlDT) => {
+                $("#" + ctlDT.id).next().data("DateTimePicker").options({ format: 'MM/DD/YYYY' });
+                $("#" + ctlDT.id).next().children("input").attr("id", ctlDT.id + "_input");
+                Common.ui.mask(ctlDT.id + "_input", "00/00/0000");
+            });
         }
 
-        /** Helper method that will apply the mask all date/time fields on a form
+        /** Helper to add artibrary masking
+        * @param controlId
+        **/
+        public static mask(controlId: string, maskPattern: string): void {
+            Common.ui.ensureMaskJsLoaded();
+
+            var ctl: any = $("#" + controlId); // use any to bypass TS compilation error
+            ctl.mask(maskPattern);
+        }
+
+        public static unmask(controlId: string): void {
+            Common.ui.ensureMaskJsLoaded();
+            var ctl: any = $("#" + controlId); // use any to bypass TS compilation error
+            ctl.unmask();
+        }
+
+        /** Helper method that will apply the mask initials
+                * @param {string} controlId control being masked
         * @return {void}
         **/
-        public static maskDateTime(): void {
-            // apply the placeholder for the dates
-            $("[data-date-format='M/D/YYYY h:mm A']").attr("placeholder", "MM/DD/YYYY h:mm A");
+        public static maskInitials(controlId: string): void {
+            Common.ui.ensureMaskJsLoaded();
+
+            var ctl: any = $("#" + controlId); // use any to bypass TS compilation error
+            ctl.mask("SSS");
+        }
+
+        /** Helper method to mask telephone/fax number to US (XXX-XXX-XXXX) and international (+XXX XXXXXXXXXXX) formats
+          * @param controlId control being masked
+          */
+        public static maskPhoneNumber(controlId: string): void {
+            Common.ui.ensureMaskJsLoaded();
+
+            let intCtl: JQuery = $("#" + controlId + '_international');
+            if (!Common.utilities.isNullUndefinedEmpty(intCtl)) {
+                let intChangeFunction = () => {
+                    Common.ui.unmask(controlId);
+                    if (!intCtl.is(":checked")) {
+                        Common.ui.mask(controlId, "000-000-0000");
+                        $("#" + controlId).attr("placeholder", "XXX-XXX-XXXX");
+                    }
+                    else {
+                        Common.ui.mask(controlId, "+00 0000000000");
+                        $("#" + controlId).attr("placeholder", "+XX XXXXXXXXXX");
+                    }
+                }
+
+                intCtl.change(intChangeFunction);
+                intChangeFunction();
+            }
+        }
+
+        public static ensureMaskJsLoaded(): void {
+            //console.log('ensureMaskJsLoaded called');
+            // if ($("#maskJS").length == 0) {
+            //    $('head').append('<script id="maskJS" src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.15/jquery.mask.js"></script>');
+            //}
+        }
+
+        /**
+         * Restrict input to non special characters only
+         * @param controlId control being filtered 
+         */
+        public static restrictSpecialCharacters(controlId: string): void {
+
+            $("#" + controlId).on('keypress', function (event) {
+
+                var pattern: RegExp = /^[A-Za-z ``'.-]+$/;
+
+                if (!pattern.test(event.key)) {
+                    return false;
+                }
+            });
         }
 
         /** Helper method that will disable a check control
@@ -346,7 +490,7 @@ namespace Common {
         * @return {void}
         **/
         public static disableCheck(controlId: string): void {
-            var ctl: JQuery = Common.ui.selectObjectById(controlId);
+            var ctl: JQuery = Common.utilities.selectObjectById(controlId);
             ctl.removeAttr('checked');
             ctl.attr('disabled', 'disabled');
         }
@@ -356,7 +500,7 @@ namespace Common {
         * @return {void}
         **/
         public static enableCheck(controlId: string): void {
-            var ctl: JQuery = Common.ui.selectObjectById(controlId);
+            var ctl: JQuery = Common.utilities.selectObjectById(controlId);
             ctl.removeAttr('disabled');
         }
 
@@ -380,33 +524,89 @@ namespace Common {
                 }
             }
         }
-
         /** Helper method that will toggle a generic element enabled / disabled.
         *   @param {string} elementId id of the element being toggled 
         *   @param {boolean} enable flag indicating whether to toggle the item enabled or disabled
         *   @param {boolean} clearValue flag indicating whether to clear the value
+        *   @param {boolean} hide flag indicating whether to hide the element
         *   @return {void}
         **/
-        public static toggleElementEnabled(elementId: string, enable?: boolean, clearValue?: boolean): void {
+        public static toggleElementEnabled(elementId: string, enable?: boolean, clearValue?: boolean, hide?: boolean): void {
             if (Common.utilities.isNullUndefinedEmpty(clearValue)) {
                 clearValue = false;
             }
             if (Common.utilities.isNullUndefinedEmpty(enable)) {
                 enable = false;
             }
-
-            var ctl: JQuery = Common.ui.selectObjectById(elementId);
-            if (clearValue == true) {
-                ctl.val(null);
-                if (ctl.prop("tagName").toLowerCase() == "textarea") {
-                    ctl.empty();
-                }
+            if (Common.utilities.isNullOrUndefined(hide)) {
+                hide = false;
             }
+
+            var ctl: JQuery = Common.utilities.selectObjectById(elementId);
+            // disable the element. hide if the additional params set
             if (enable) {
-                ctl.removeAttr('readonly');
+                if (ctl.parents(".form-readonly").length == 0) {
+                    ctl.removeAttr('readonly');
+                }
+                if (hide) {
+                    Common.ui.showElement(elementId);
+                }
             }
             else {
                 ctl.attr('readonly', true);
+                if (hide) {
+                    Common.ui.hideElement(elementId)
+                }
+                // only clear the value on hide/disable
+                if (clearValue == true) {
+                    ctl.val(null);
+                    if (ctl.prop("tagName").toLowerCase() == "textarea") {
+                        ctl.empty();
+                    }
+                    // maybe be a lookup with the name field also needing to be cleared
+                    var ctl_name: JQuery = Common.utilities.selectObjectById(elementId + "_name");
+                    if (!Common.utilities.isNullUndefinedEmpty(ctl_name)) {
+                        ctl_name.val(null);
+                    }
+                    // maybe be a radio button (option set as radio button)
+                    $("#" + elementId + " input[type=radio]:checked").attr('checked', false);
+                    // maybe be a checkbox
+                    $("input[type=checkbox]:checked" + "#" + elementId).attr('checked', false);
+
+                    // in case there are triggers on this
+                    $("#" + elementId).change();
+                }
+            }
+        }
+
+        public static hideElement(controlId: string): void {
+            Common.ui.toggleElementDisplay(controlId, true);
+        }
+
+        public static showElement(controlId: string): void {
+            Common.ui.toggleElementDisplay(controlId, false)
+        }
+
+        public static toggleElementDisplay(controlId: string, hide: boolean): void {
+
+            var ctl: JQuery = Common.utilities.selectObjectById(controlId);
+            let fieldContainer = ctl.parents("td.cell");
+
+            if (!Common.utilities.isNullOrUndefined(fieldContainer)) {
+                if (hide) {
+                    Common.ui.AnimateHideElement(fieldContainer);
+                }
+                else {
+                    Common.ui.AnimateShowElement(fieldContainer);
+                }
+            }
+            else {
+                if (hide) {
+                    Common.ui.AnimateHideElement(ctl);
+                }
+                else {
+                    Common.ui.AnimateShowElement(ctl);
+                }
             }
         }
 
@@ -416,9 +616,9 @@ namespace Common {
         *   @param {boolean} clearValue flag indicating whether to clear the value
         *   @return {void}
         **/
-        public static toggleElementsEnabled(elementIdList: Array<string>, enable?: boolean, clearValue?: boolean): void {
+        public static toggleElementsEnabled(elementIdList: Array<string>, enable?: boolean, clearValue?: boolean, hide?: boolean): void {
             for (let elementId of elementIdList) {
-                Common.ui.toggleElementEnabled(elementId, enable, clearValue)
+                Common.ui.toggleElementEnabled(elementId, enable, clearValue, hide)
             }
         }
         /**  Helper method to disable the date Picker control
@@ -426,123 +626,24 @@ namespace Common {
         *   @return {void}
         **/
         public static disableDatePick(controlId: string): void {
-            var cal: JQuery = Common.ui.selectObjectById(controlId);
+            var cal: JQuery = Common.utilities.selectObjectById(controlId);
             cal.next().data("DateTimePicker").destroy();
         }
-
-
-        /** Helper method that will attach the red asterisk reqired marker to an input control when a control is 
-         * @param {Common.triggerControl} triggerCtl control schema name and control type('check', 'radio', 'optionset', 'text') that will trigger the validation and value determine whether the validation should occur
-         * @param {string} valueControlId schema name of the control value being checked for null
-        **/
-        public static addRequiredMarkingHandler(triggerCtl: triggerControl, valueControlId: string, useClassName?: boolean): void {
-            // add the required marker to the trigger control
-            var trigger: JQuery = Common.ui.selectObjectById(triggerCtl.id);
-
-            // if this is a radio button, we need to react to the check of each in the group.
-            // so get all inputs in the parent and attach change to that!
-            if (triggerCtl.type == "radio") {
-                trigger = trigger.parent().find("input[type='radio']");
-            }
-
-            trigger.change(
-                () => {
-                    var isTriggered: boolean = Common.validators.isControlTriggered(triggerCtl);
-                    Common.ui.toggleFieldRequired(valueControlId, isTriggered, useClassName);
-                }
-            );
-
-            // fire the on change event here so that the validator runs on initial load
-            trigger.trigger("change");
-        }
-
-        /** Hide/show the red asterisk next to a field label to indicate required
-        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
-        *   @param {string} controlId control being flagged as required
-        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
-        **/
-        public static toggleFieldRequired(controlId: string, required?: boolean, useClassName?: boolean): void {
-
-            var controlLabelId: string = controlId + "_label";
-
-            var ctl: JQuery = Common.ui.selectObjectById(controlLabelId);
-            Common.ui.toggleElementRequired(ctl, required, useClassName);
-        }
-
-        /** Helper function that will add a Required indicator on a Section header
-        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
-        *   @param {string} sectionName name of the section in the CRM entity form
-        *   @param {boolean} required option flag indicating whether to add or remove reqiured flag
-        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
-        **/
-        public static toggleSectionRequired(sectionName: string, required?: boolean, useClassName?: boolean): void {
-
-            //var selector: string = "table.section[data-name='" + sectionDataName + "']";
-            //var element: JQuery = $(selector);
-
-            var section: JQuery = Common.ui.getSection(sectionName);
-            if (section.length > 0) {
-                Common.ui.toggleElementRequired(section.prev(), required, useClassName);
-            }
-        }
-
-        /** Helper function that will add a Required indicator on a Tab header
-        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
-        *   @param {string} tabName name of the tab in the CRM entity form
-        *   @param {boolean} required option flag indicating whether to add or remove reqiured flag
-        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
-        **/
-        public static toggleTabRequired(tabName: string, required?: boolean, useClassName?: boolean): void {
-
-            // var selector: string = "div#EntityFormView div.tab.clearfix[data-name='" + tabName + "']";
-            // var element: JQuery = $(selector);
-            var tab: JQuery = Common.ui.getTab(tabName);
-
-            if (tab.length > 0) {
-                Common.ui.toggleElementRequired(tab.prev(), required, useClassName);
-            }
-        }
-
         /**
-         * Helper method to toggled the required indicator
-         * @param {JQuery} element UI element being flagged as require
-         * @param {boolean} required is required or not 
-         * @param {boolean} useClassName use a class name instead of the injected element
+         * Set the Text of a Label
+         * @param field
+         * @param labelText
          */
-        public static toggleElementRequired(element: JQuery, required?: boolean, useClassName?: boolean): void {
-            if (element.length > 0) {
-                var validatorId = element.attr("id") + "_required_indicator";
-
-                // allow for message override
-                if (Common.utilities.isNullUndefinedEmpty(required)) {
-                    required = true;
-                }
-                if (Common.utilities.isNullUndefinedEmpty(useClassName)) {
-                    useClassName = true;
-                }
-
-                if (required) {
-                    if (useClassName) {
-                        element.addClass(REQUIRED_CLASSNAME);
-                    }
-                    else {
-                        // insert the DIV after the element 
-                        if (!Common.utilities.elementExists(validatorId)) {
-                            var div: JQuery = $("<div class='validators' id='" + validatorId + "'/>");
-                            div.html(" *");
-                            div.insertAfter(element);
-                        }
-                    }
-                }
-                else {
-                    if (useClassName) {
-                        element.removeClass(REQUIRED_CLASSNAME);
-                    }
-                    else {
-                        $("#" + validatorId).remove();
-                    }
-                }
+        public static setLabelText(field: string, labelText: string): void {
+            // needs to be called before modals
+            let label: JQuery = $('#' + field + '_label');
+            if (!Common.utilities.isNullOrUndefined(label)) {
+                label.html(labelText);
             }
+        }
+        public static getLabelText(field: string): string {
+            let label: JQuery = $('#' + field + '_label');
+            return label.html();
         }
     }
 }

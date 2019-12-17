@@ -7,3 +7,13 @@
 // * Script Validator Samples - Create
 // * Script Validator Samples - Edit
 // {% include 'Script - Validator Samples' %}
+
+// {% include 'Script - Common Utilities' %}
+// {% include 'Script - UI Utilities' %}
+// {% include 'Script - Validators' %}
+
+// {% include 'Script - Validator Samples' %}
+
+$(document).ready(function () {
+    PortalScriptSamples.AllValidatorSamples.ApplyValidators();
+});

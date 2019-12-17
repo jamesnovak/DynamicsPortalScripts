@@ -3,6 +3,11 @@
 /// <reference path="../typings/jquery/jquery.d.ts"/>
 'use strict';
 
+/** Constants! */
+// TODO add more constants for selectors
+const REQUIRED_CLASSNAME: string = "MSFT-requred-field";
+const DISABLEDFIELD_CLASSNAME: string = "MSFT-disabled-field";
+
 /**
  * General namespace for all Portal related scripts.
  * This can be modified for a business or project but all references will need to be updated
@@ -16,7 +21,8 @@ namespace Common {
     export interface ITriggerControl {
         id: string,
         type: string,
-        value: any
+        value: any,
+        inverseValue?: boolean
     }
     /** Implementation of [[ITriggerControl]] used as a method parameter in several linked validators
      */
@@ -25,16 +31,19 @@ namespace Common {
          * Constructor
          * @param {string} id trigger control id
          * @param {string} type control type - 'check', 'radio', 'optionset', 'text'
-         * @param {any} value trigger value for the control
+         * @param {any} value trigger value(s) for the control (pass)
+         * @param {boolean?} inverseValue trigger on all but the value(s) provideds
          */
-        constructor(id: string, type: string, value: any) {
+        constructor(id: string, type: string, value: any, inverseValue?: boolean) {
             this.id = id;
             this.type = type;
             this.value = value;
+            this.inverseValue = inverseValue;
         }
         id: string;
         type: string;
         value: any;
+        inverseValue?: boolean;
     }
 
     /**
@@ -55,13 +64,14 @@ namespace Common {
         **/
         public static addValidator(controlId: string, validatorIdPrefix: string, failureMessageMask: string, evalFunction: () => boolean, initialValue?: string, validationGroup?: string): void {
 
-            if (typeof (Common.Page_Validators) == 'undefined') {
-                throw ("Page_Validators is undefined in this web form step");
+            if (typeof (Page_Validators) == 'undefined') {
+                console.log ("Page_Validators is undefined in this web form step");
             }
 
             // check default params
             if (Common.utilities.isNullUndefinedEmpty(validationGroup))
                 validationGroup = "";
+
             if (Common.utilities.isNullUndefinedEmpty(initialValue))
                 initialValue = "";
 
@@ -92,8 +102,12 @@ namespace Common {
             validator.setAttribute("initialvalue", initialValue);
             validator.evaluationfunction = evalFunction;
 
+            // prevent duplicates for same validation added multiple times
+            // TODO: may want to remove previous one and replace instead
+            if (!Common.validators.hasValidator(validator.id)) {
             // add the page validator and hook the error message click
             Page_Validators.push(validator);
+        }
         }
 
         /**
@@ -115,7 +129,7 @@ namespace Common {
                 }
             }
             // ensure that the field is not still flagged as required 
-            Common.ui.toggleFieldRequired(validatorId, false);
+            Common.validators.toggleFieldRequired(validatorId, false, false);
         }
 
         /**
@@ -130,12 +144,79 @@ namespace Common {
 
             for (let validator of validators) {
                 var id: string = validator.id;
-                if (id.indexOf(validatorId) > -1) {
+                //if (id.indexOf(validatorId) > -1) {
+                //    return true;
+                //}
+                if (id.indexOf(validatorId, id.length - validatorId.length) !== -1) {
                     return true;
                 }
             }
 
             return false;
+        }
+
+        /**
+         * Ensures that a number is greater than or equal to a min number, less than or equal to a min number, between both, inclusive.
+         * @param {string} controlId Number control being validated
+         * @param {number} minNumber min number allowed for the control
+         * @param {number} maxNumber max number allowed for the control
+         */
+        public static addNumberRangeValidator(controlId: string, minNumber?: number, maxNumber?: number, messageMaskOverride?: string): void {
+            var validatorPrefix: string = "NumberRangeValidator";
+            var messageMask: string = null;
+
+            // make sure the control exists~
+            if (!Common.utilities.elementExists(controlId)) {
+                throw ("Error: unable to find the control with Id: " + controlId);
+            }
+
+            if (minNumber == null && maxNumber == null) {
+                throw ("Error: minNumber and maxNumber cannot both be null.");
+            }
+            else if (minNumber == null && maxNumber != null) {
+                validatorPrefix = "MaxNumberValidator";
+                messageMask = "{label} must be less than or equal to " + maxNumber + ".";
+            }
+            else if (minNumber != null && maxNumber == null) {
+                validatorPrefix = "MinNumberValidator";
+                messageMask = "{label} must be greater than or equal to " + minNumber + ".";
+            }
+            else {
+                messageMask = "{label} must be a a number between " + minNumber + " and " + maxNumber + ", inclusive.";
+            }
+
+            if (!Common.utilities.isNullUndefinedEmpty(messageMaskOverride)) {
+                messageMask = messageMaskOverride;
+            }
+
+            // add the validator to the control
+            Common.validators.addValidator(controlId,
+                validatorPrefix,
+                messageMask,
+                () => {
+                    var isValid = true;
+                    var val = $("#" + controlId).val();
+
+                    if (!Common.utilities.isNullUndefinedEmpty(val)) {
+                        if (minNumber == null && maxNumber != null) {
+                            if (val > maxNumber) {
+                                isValid = false;
+                            }
+                        }
+                        else if (minNumber != null && maxNumber == null) {
+                            if (val < minNumber) {
+                                isValid = false;
+                            }
+                        }
+                        else {
+                            if (val < minNumber ||
+                                val > maxNumber) {
+                                isValid = false;
+                            }
+                        }
+                    }
+                    return isValid;
+                });
         }
 
         /**
@@ -149,7 +230,7 @@ namespace Common {
          * @param {Date} minDate min date allowed for the control
          * @param {Date} maxDate max date allowed for the control
          */
-        public static addDateRangeValidator(controlId: string, minDate?: Date, maxDate?: Date): void {
+        public static addDateRangeValidator(controlId: string, minDate?: Date, maxDate?: Date, messageMaskOverride?: string): void {
             
             var validatorPrefix: string = "DateRangeValidator";
             var messageMask: string = null;
@@ -171,8 +252,13 @@ namespace Common {
                 messageMask = "{label} must be a date on or after " + minDate.toLocaleDateString() + ".";
             }
             else {
-                messageMask = "{label} must be a date between " + minDate.toLocaleDateString() + " and " + minDate.toLocaleDateString() + ".";
+                messageMask = "{label} must be a date between " + minDate.toLocaleDateString() + " and " + maxDate.toLocaleDateString() + ".";
             }
+
+            if (!Common.utilities.isNullUndefinedEmpty(messageMaskOverride)) {
+                messageMask = messageMaskOverride;
+            }
+
             // add the validator to the control
             Common.validators.addValidator(controlId,
                 validatorPrefix,
@@ -249,7 +335,8 @@ namespace Common {
 
             // make sure the control exists~
             if (!Common.utilities.elementExists(controlId)) {
-                throw ("Error: unable to find the control with Id: " + controlId);
+                console.log("Error: unable to find the control with Id: " + controlId);
+                return;
             }
 
             // use the common method to add the future date validation
@@ -265,6 +352,40 @@ namespace Common {
 
                         // TODO - use UTC conversions?
                         if (newDate.getTime() > now.getTime()) {
+                            isValid = false;
+                        }
+                    }
+                    return isValid;
+                }
+            );
+        }
+
+        /**
+         * Injects a new control validator that restricts users from entering a dates in "from"/"to" date fields where "to" is before "from".
+         * @param dateFromControlId schema name of the "from" date control being validated
+         * @param dateToControlId schema name of the "to" date control being validated
+         * @param errorMessage error message to show if "to" is before "from"
+         */
+        public static addDateFromToValidator(dateFromControlId: string, dateToControlId: string, errorMessage: string) {
+            // make sure the controls exists~
+            if (!Common.utilities.elementExists(dateFromControlId)) {
+                throw ("Error: unable to find the control with Id: " + dateFromControlId);
+            }
+            if (!Common.utilities.elementExists(dateToControlId)) {
+                throw ("Error: unable to find the control with Id: " + dateToControlId);
+            }
+
+            // use the common method to add the date after validation
+            Common.validators.addValidator(dateToControlId,
+                "DateFromToValidator_" + dateFromControlId,
+                errorMessage,
+                () => {
+                    var isValid = true;
+                    var fromDateVal = $("#" + dateFromControlId).val();
+                    var toDateVal = $("#" + dateToControlId).val();
+                    if (fromDateVal != null && toDateVal != null) {
+                        // TODO - use UTC conversions?
+                        if (new Date(fromDateVal).getTime() > new Date(toDateVal).getTime()) {
                             isValid = false;
                         }
                     }
@@ -290,10 +411,10 @@ namespace Common {
         public static addNullValidator(controlId: string, failureMessageMask?: string): void {
 
             if (Common.utilities.isNullUndefinedEmpty(failureMessageMask)) {
-                failureMessageMask = "Please provide a value for {label}.";
+                failureMessageMask = "{label} is a required field.";
             }
 
-            Common.ui.toggleFieldRequired(controlId, true);
+            validators.toggleFieldRequired(controlId, true, false);
 
             // use the helper method to inject the null dependent null value check
             Common.validators.addValidator(controlId,
@@ -347,14 +468,16 @@ namespace Common {
                 failureMessageMask,
                 () => {
                     var isValid: boolean = true;
-                    console.log("isValid: " + isValid + ", minRows: " + minRows + ", maxRows: " + maxRows);
+                    //console.log("isValid: " + isValid + ", minRows: " + minRows + ", maxRows: " + maxRows);
+
+                    if ($("#" + gridId).is(":visible")) {
                     // get the number of rows in the grid
                     // TODO move this into helper function?
                     var rowCount: number = $("#" + gridId + " div.view-grid table tbody tr[data-id]").length;
 
                     // see if the pager is there with pages
                     var hasPageControl: boolean = !$("#" + gridId + " div.view-pagination").is(":hidden");
-                    console.log("rowCount: " + rowCount + ", hasPageControl: " + hasPageControl);
+                        //console.log("rowCount: " + rowCount + ", hasPageControl: " + hasPageControl);
 
                     // check min rows
                     if (!isNaN(minRows as any) && (minRows != null)) {
@@ -364,7 +487,8 @@ namespace Common {
                     if (isValid && !isNaN(maxRows as any) && (maxRows != null)) {
                         isValid = (rowCount <= maxRows);
                     }
-                    console.log("isValid: " + isValid + "rowCount: " + rowCount + ",  minRows: " + minRows + ", maxRows: " + maxRows);
+                    }
+                    //console.log("isValid: " + isValid + "rowCount: " + rowCount + ",  minRows: " + minRows + ", maxRows: " + maxRows);
 
                     return isValid;
                 }
@@ -453,11 +577,13 @@ namespace Common {
          * @param {string} failureMessageMask optional mask for the message to be displayed. The slug {label} will be replaced with the value field label
          * @param {boolean} addLinkedEnableToggle optional flag indicating whether to toggle the value control enabled when trigger is met
          * @param {string} validationGroup validation group for evaluating this validator
-         * @param {boolean} clearField inidicates whether or not the field should be cleared if enabled/disabled
+         * @param {boolean} clearField indicates whether or not the field should be cleared if enabled/disabled
+         * @param {boolean} hideField indicates whether or not the field should be hidden when disabled
+         * @param {boolean} inverse indicates whether to inverse the enabling/disabling (if field1 value is some value, disable/hide another field, otherwise enable/show)
          * @returns {void}
          */
         public static addLinkedNullValidator( triggerCtl: triggerControl, valueControlId: string | string[], failureMessageMask?: string,
-            addLinkedEnableToggle?: boolean, validationGroup?: string, clearField?: boolean): void {
+            addLinkedEnableToggle?: boolean, validationGroup?: string, clearField?: boolean, hideField?: boolean): void {
             // debugger
             // check our parameters, set default
             if (Common.utilities.isNullUndefinedEmpty(addLinkedEnableToggle)) {
@@ -465,7 +591,7 @@ namespace Common {
             }
 
             if (Common.utilities.isNullUndefinedEmpty(failureMessageMask)) {
-                failureMessageMask = "Please provide a value for {label}.";
+                failureMessageMask = "{label} is a required field.";
             }
 
             //check to see if valueControlId is a string or string array 
@@ -477,11 +603,11 @@ namespace Common {
             // iterate
             $.each(valueControlId, (i, val) => {
                 // add the required marker to the trigger control
-                Common.ui.addRequiredMarkingHandler(triggerCtl, val, false);
+                Common.validators.addRequiredMarkingHandler(triggerCtl, val, false);
 
                 // if indicated, add the enable toggle to the target value control
                 if (addLinkedEnableToggle) {
-                    Common.validators.addLinkedEnableToggle(triggerCtl, val, clearField);
+                    Common.validators.addLinkedEnableToggle(triggerCtl, val, clearField, hideField);
                 }
 
                 // use the helper method to inject the null dependent null value check
@@ -593,19 +719,6 @@ namespace Common {
                 validationGroup
             );
         }
-        /**
-         *  Helper method to get the control Id of the first checkbox in a section
-         * @param section {JQuery} section element 
-         */
-        private static GetCheckBoxControlId(section: JQuery): string
-        {
-            // get the list of checkboxes in the section and grab the ID
-            var firstCheck: JQuery = $(" tbody tr td.cell.checkbox-cell input[type='checkbox']", section).first();
-            var controlId: string = firstCheck.attr("id");
-
-            return controlId;
-        }
-
 
         /** Adds a validator that will ensure that a max number of check boxes have been checked for a specific section
             @param {string} sectionName     name of the section that contains the group of checkboxes
@@ -670,7 +783,7 @@ namespace Common {
 
             var regEx: RegExp = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
 
-            Common.validators.addRegExValidator(controlId, regEx, "Please provide a valid email address.");
+            Common.validators.addRegExValidator(controlId, regEx, "Please provide a valid email address for {label}");
         }
         /**
          * General method for applying a regular expression validator to a control
@@ -707,11 +820,12 @@ namespace Common {
         * @param {Common.triggerControl} triggerCtl control schema name and control type('check', 'radio', 'optionset', 'text') that will trigger the validation and value determine whether the validation should occur
         * @param {string} controlId schema name of the control value being checked enable/disable
         * @param {boolean} clearField indicates whether or not to clear a field when enabled/disabled
+        * @param {boolean} hideField indicates whether or not to hide a field that is being disabled
         **/
-        public static addLinkedEnableToggle(triggerCtl: triggerControl, controlId: string, clearField?: boolean): void {
+        public static addLinkedEnableToggle(triggerCtl: triggerControl, controlId: string, clearField?: boolean, hideField?: boolean): void {
 
             // grab the target trigger control.
-            var trigger: JQuery = Common.ui.selectObjectById(triggerCtl.id);
+            var trigger: JQuery = Common.utilities.selectObjectById(triggerCtl.id);
 
             // if this is a radio button, we need to trigger on the group change to account for deselect.
             // so get the name and use that as the selector
@@ -724,18 +838,21 @@ namespace Common {
             // add the change handler
             trigger.change(() => {
                 var isTriggered: boolean = Common.validators.isControlTriggered(triggerCtl);
-                var ctl: JQuery = Common.ui.selectObjectById(controlId);
+                var ctl: JQuery = Common.utilities.selectObjectById(controlId);
 
                 if (Common.utilities.isNullUndefinedEmpty(clearField)) {
                     clearField = true;
                 }
-                Common.ui.toggleElementEnabled(controlId, isTriggered, clearField);
+                if (Common.utilities.isNullUndefinedEmpty(hideField)) {
+                    hideField = false;
+                }
+                Common.ui.toggleElementEnabled(controlId, isTriggered, clearField, hideField);
             });
 
             // manually perform the "trigger" logic now, with the clear field as null so that we don't inadvertently wipe out the value
             var isTriggeredInit: boolean = Common.validators.isControlTriggered(triggerCtl);
 
-            Common.ui.toggleElementEnabled(controlId, isTriggeredInit, false);
+            Common.ui.toggleElementEnabled(controlId, isTriggeredInit, false, hideField);
         }
 
         /** Helper method that will determine whether our trigger control is ... triggered!
@@ -743,14 +860,24 @@ namespace Common {
          **/
         public static isControlTriggered(triggerCtl: triggerControl): boolean {
             var isTriggered: boolean = false;
+            var inverse: boolean = false;
+            if (!Common.utilities.isNullUndefinedEmpty(triggerCtl.inverseValue)) {
+                inverse = triggerCtl.inverseValue;
+            }
+
+            if (!(triggerCtl.value instanceof Array)) {
+                triggerCtl.value = [triggerCtl.value];
+            }
+            for (let val of triggerCtl.value) {
+                if (!isTriggered) {
             switch (triggerCtl.type) {
                 case "check":
                 case "radio":
                     var isChecked = $("#" + triggerCtl.id).is(":checked");
 
                     // if true/false passed, compare against checked value. allows to link to UNCHECKED
-                    if (typeof (triggerCtl.value) === "boolean") {
-                        isTriggered = (triggerCtl.value == isChecked);
+                            if (typeof (val) === "boolean") {
+                                isTriggered = (val == isChecked);
                     }
                     else {
                         isTriggered = isChecked;
@@ -759,16 +886,187 @@ namespace Common {
 
                 case "optionset":
                     var valueNum: number = $("#" + triggerCtl.id + " option:selected").val();
-                    isTriggered = (valueNum == triggerCtl.value);
+                            isTriggered = (valueNum == val);
+                            if (!isTriggered) {
+                                // the optionset could be getting rendered as radio buttons
+                                valueNum = $("#" + triggerCtl.id).find("input[type=radio]:checked").val();
+                                isTriggered = (valueNum == val);
+                                // the optionset (lookup) can just be a text field
+                                if (!isTriggered) {
+                                    valueNum = $("#" + triggerCtl.id).val();
+                                    isTriggered = (valueNum == val);
+                                }
+                            }
                     break;
 
                 case "text":
                     var valueStr: string = $("#" + triggerCtl.id).val();
-                    isTriggered = (valueStr == triggerCtl.value);
+                            isTriggered = (valueStr == val);
                     break;
+                    }
+                }
+            }
+            if (inverse) {
+                isTriggered = !isTriggered;
             }
             return isTriggered;
         }
 
+        /** Helper method that will attach the red asterisk reqired marker to an input control when a control is 
+         * @param {Common.triggerControl} triggerCtl control schema name and control type('check', 'radio', 'optionset', 'text') that will trigger the validation and value determine whether the validation should occur
+         * @param {string} valueControlId schema name of the control value being checked for null
+        **/
+        public static addRequiredMarkingHandler(triggerCtl: triggerControl, valueControlId: string, useClassName?: boolean): void {
+            // add the required marker to the trigger control
+            var trigger: JQuery = Common.utilities.selectObjectById(triggerCtl.id);
+
+            // if this is a radio button, we need to react to the check of each in the group.
+            // so get all inputs in the parent and attach change to that!
+            if (triggerCtl.type == "radio") {
+                trigger = trigger.parent().find("input[type='radio']");
+            }
+
+            trigger.change(
+                () => {
+                    var isTriggered: boolean = Common.validators.isControlTriggered(triggerCtl);
+                    Common.validators.toggleFieldRequired(valueControlId, isTriggered, useClassName);
+                }
+            );
+
+            // fire the on change event here so that the validator runs on initial load
+            trigger.trigger("change");
+        }
+
+        /** Hide/show the red asterisk next to a field label to indicate required
+        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
+        *   @param {string} controlId control being flagged as required
+        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
+        **/
+        public static toggleFieldRequired(controlId: string, required?: boolean, useClassName?: boolean): void {
+
+            var controlLabelId: string = controlId + "_label";
+
+            var ctl: JQuery = Common.utilities.selectObjectById(controlLabelId);
+            Common.validators.toggleElementRequired(ctl, required, useClassName);
+        }
+
+        /** Helper function that will add a Required indicator on a Section header
+        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
+        *   @param {string} sectionName name of the section in the CRM entity form
+        *   @param {boolean} required option flag indicating whether to add or remove reqiured flag
+        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
+        **/
+        public static toggleSectionRequired(sectionName: string, required?: boolean, useClassName?: boolean): void {
+
+            //var selector: string = "table.section[data-name='" + sectionDataName + "']";
+            //var element: JQuery = $(selector);
+
+            var section: JQuery = Common.ui.getSection(sectionName);
+            if (section.length > 0) {
+                Common.validators.toggleElementRequired(section.prev(), required, useClassName);
+            }
+        }
+
+        /** Helper function that will add a Required indicator on a Tab header
+        *    NOTE: this is dependent upon the .MSFT-requred-field::after css element present in the Page definition custom CSS
+        *   @param {string} tabName name of the tab in the CRM entity form
+        *   @param {boolean} required option flag indicating whether to add or remove reqiured flag
+        *   @param {boolean} useClassName option flag indicating whether to use CSS or inject an element
+        **/
+        public static toggleTabRequired(tabName: string, required?: boolean, useClassName?: boolean): void {
+
+            // var selector: string = "div#EntityFormView div.tab.clearfix[data-name='" + tabName + "']";
+            // var element: JQuery = $(selector);
+            var tab: JQuery = Common.ui.getTab(tabName);
+
+            if (tab.length > 0) {
+                Common.validators.toggleElementRequired(tab.prev(), required, useClassName);
+            }
+        }
+
+        /**
+         * Helper method to toggled the required indicator
+         * @param {JQuery} element UI element being flagged as require
+         * @param {boolean} required is required or not 
+         * @param {boolean} useClassName use a class name instead of the injected element
+         */
+        public static toggleElementRequired(element: JQuery, required?: boolean, useClassName?: boolean): void {
+            if (element.length > 0) {
+                //var validatorId = element.attr("id") + "_required_indicator";
+
+                // allow for message override
+                if (Common.utilities.isNullUndefinedEmpty(required)) {
+                    required = true;
+                }
+                if (Common.utilities.isNullUndefinedEmpty(useClassName)) {
+                    useClassName = true;
+                }
+
+                if (required) {
+                    if (useClassName) {
+                        element.addClass(REQUIRED_CLASSNAME);
+                    }
+                    else {
+                        element.parents('.info').addClass('required'); // same as normal required fields on the portal
+                    }
+                }
+                else {
+                    if (useClassName) {
+                        element.removeClass(REQUIRED_CLASSNAME);
+                    }
+                    else {
+                        element.parents('.info').removeClass('required');
+                    }
+                }
+            }
+        }
+
+        /**
+         * Helper function to hide/show sections based off a triggerControl getting triggered.
+         * @param {triggerControl} triggerCtl the trigger control
+         * @param {string} sectionName the section name
+         */
+        public static addTriggedSectionToggle(triggerCtl: triggerControl, sectionName: string): void {
+            let ctl = Common.utilities.selectObjectById(triggerCtl.id);
+
+            let toggleSection = function (clearValues: boolean) {
+                let isTriggered: boolean = Common.validators.isControlTriggered(triggerCtl);
+                if (isTriggered) {
+                    Common.ui.showSection(sectionName);
+                }
+                else {
+                    Common.ui.hideSection(sectionName, clearValues);
+                }
+            }
+            ctl.change(() => {
+                toggleSection(true);
+            });
+            toggleSection(false);
+        }
+
+        public static addCustomTriggeredSectionToggle(sectionName: string, triggerFunction: () => boolean, triggerCtls: string | string[]): void {
+            let toggleSection = function (clearValues: boolean) {
+                let isTriggered: boolean = triggerFunction();
+                if (isTriggered) {
+                    Common.ui.showSection(sectionName);
+                }
+                else {
+                    Common.ui.hideSection(sectionName, clearValues);
+                }
+            }
+
+            if (typeof triggerCtls === 'string') {
+                triggerCtls = [triggerCtls];
+            }
+
+            for (let triggerCtl of triggerCtls) {
+                let ctl = Common.utilities.selectObjectById(triggerCtl);
+                ctl.change(() => {
+                    toggleSection(true);
+                });
+            }
+            
+            toggleSection(false);
+        }
     }
 }
